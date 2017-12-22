@@ -104,21 +104,24 @@ int main()
             double psi = j[1]["psi"];
             double v = j[1]["speed"];
 
-            Eigen::VectorXd xvals(ptsx.size());
-            Eigen::VectorXd yvals(ptsy.size());
-
             // Shift the car's reference to 90 degrees
             for (uint i = 0; i < ptsx.size(); i++)
             {
               double shift_x = ptsx[i]-px;
               double shift_y = ptsy[i]-py;
 
-              xvals[i] = (shift_x * cos(0-psi) - shift_y*sin(0/psi));
-              yvals[i] = (shift_x * sin(0-psi) + shift_y*cos(0/psi));
+              ptsx[i] = (shift_x * cos(0-psi) - shift_y*sin(0-psi));
+              ptsy[i] = (shift_x * sin(0-psi) + shift_y*cos(0-psi));
             }
 
+            // Share the waypoints with Eigen vectors
+            double* ptrx = &ptsx[0];
+            Eigen::Map<Eigen::VectorXd> ptsx_eigen(ptrx, 6);
+            double* ptry = &ptsy[0];
+            Eigen::Map<Eigen::VectorXd> ptsy_eigen(ptry, 6);
+
             // Calculate the coeffs and use to get the horizontal cte and epsi
-            auto coeffs = polyfit(xvals, yvals, 3);
+            auto coeffs = polyfit(ptsx_eigen, ptsy_eigen, 3);
             double cte = polyeval(coeffs, 0);
             double epsi = -atan(coeffs[1]);
 
@@ -133,12 +136,11 @@ int main()
              */
             auto vars = mpc.Solve(state, coeffs);
 
-            double steer_value = vars[0];
-            double throttle_value = vars[1];
+            const double LF = 2.67;
 
             json msgJson;
-            msgJson["steering_angle"] = steer_value;
-            msgJson["throttle"] = throttle_value;
+            msgJson["steering_angle"] = vars[0]/(deg2rad(25)*LF);
+            msgJson["throttle"] = vars[1];
 
             //Display the MPC predicted trajectory
             vector<double> mpc_x_vals;
