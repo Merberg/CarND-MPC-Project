@@ -7,7 +7,7 @@ using CppAD::AD;
 
 // The timestep length and duration
 size_t N = 10;
-double dt = 0.1;
+double dt = 0.15;
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -52,21 +52,24 @@ class FG_eval {
 
     // The part of the cost based on the reference state.
     for (size_t t = 0; t < N; t++) {
+      //Cost function penalty for cross-track error
       fg[0] += 2000*CppAD::pow(vars[CTE_START + t] - REF_CTE, 2);
-      fg[0] += 2000*CppAD::pow(vars[EPSI_START + t] - REF_EPSI, 2);
+      //Penalize for angle error
+      fg[0] += 1000*CppAD::pow(vars[EPSI_START + t] - REF_EPSI, 2);
+      //Penalize for stopping or driving too fast
       fg[0] += CppAD::pow(vars[V_START + t] - REF_V, 2);
     }
 
     // Minimize the use of actuators.
     for (size_t t = 0; t < N - 1; t++) {
-      fg[0] += 5*CppAD::pow(vars[DELTA_START + t], 2);
-      fg[0] += 5*CppAD::pow(vars[A_START + t], 2);
+      fg[0] += 500*CppAD::pow(vars[DELTA_START + t], 2);
+      fg[0] += 10*CppAD::pow(vars[A_START + t], 2);
     }
 
-    // Minimize the value gap between sequential actuations.
+    // Minimize the change between sequential actuations (steering and throttle).
     for (size_t t = 0; t < N - 2; t++) {
-      fg[0] += 200 * CppAD::pow(vars[DELTA_START + t + 1] - vars[DELTA_START + t], 2);
-      fg[0] += 10*CppAD::pow(vars[A_START + t + 1] - vars[A_START + t], 2);
+      fg[0] += 5*CppAD::pow(vars[DELTA_START + t + 1] - vars[DELTA_START + t], 2);
+      fg[0] += 5*CppAD::pow(vars[A_START + t + 1] - vars[A_START + t], 2);
     }
 
     // Initial constraints
@@ -224,10 +227,6 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs)
 
   // Check some of the solution values
   ok &= solution.status == CppAD::ipopt::solve_result<Dvector>::success;
-
-  // Cost
-  auto cost = solution.obj_value;
-  std::cout << "Cost " << cost << std::endl;
 
   //Determine result
   vector<double> result;
